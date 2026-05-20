@@ -11,6 +11,8 @@ import json
 import os
 
 import pandas as pd
+from transformers import pipeline
+from rouge_score import rouge_scorer
 
 
 # -- Helpers (provided — do NOT modify) --------------------------------------
@@ -36,8 +38,8 @@ def _output_path() -> str:
 
 def build_summarizer(model_name: str):
     """Construct a Hugging Face summarization pipeline."""
-    # TODO: build a summarization pipeline using the given model name (same as the drill)
-    raise NotImplementedError("build_summarizer not implemented")
+    # Build a summarization pipeline using the given model name
+    return pipeline("summarization", model=model_name)
 
 
 def summarize_one(summ, text: str, max_length: int = 120, min_length: int = 30) -> str:
@@ -47,8 +49,16 @@ def summarize_one(summ, text: str, max_length: int = 120, min_length: int = 30) 
     Use do_sample=False, num_beams=4. Return the summary STRING from
     [0]["summary_text"].
     """
-    # TODO: invoke the pipeline with deterministic generation parameters (no sampling, beam search) and return the summary string
-    raise NotImplementedError("summarize_one not implemented")
+    # Invoke the pipeline with deterministic generation parameters (no sampling, beam search)
+    result = summ(
+        text,
+        max_length=max_length,
+        min_length=min_length,
+        do_sample=False,
+        num_beams=4
+    )
+    # Extract and return the final generated summary string
+    return result[0]["summary_text"]
 
 
 # -- Task 2: ROUGE -----------------------------------------------------------
@@ -62,9 +72,18 @@ def compute_rouge(pred: str, ref: str) -> dict:
 
     Returns {"rouge1": float, "rouge2": float, "rougeL": float}, all F1.
     """
-    # TODO: build a stemming-enabled ROUGE scorer over the three metric variants
-    # TODO: score the (reference, predicted) pair and return F1 measures only (note argument order)
-    raise NotImplementedError("compute_rouge not implemented")
+    # Instantiate the stemming-enabled ROUGE scorer over the three metric variants
+    scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
+    
+    # Score the pair adhering to strict argument order: reference first, then predicted
+    scores = scorer.score(ref, pred)
+    
+    # Return F1 measures only
+    return {
+        "rouge1": float(scores["rouge1"].fmeasure),
+        "rouge2": float(scores["rouge2"].fmeasure),
+        "rougeL": float(scores["rougeL"].fmeasure)
+    }
 
 
 # -- Task 3: Evaluate over the corpus ----------------------------------------
@@ -85,10 +104,52 @@ def evaluate_summaries(summ, articles_df: pd.DataFrame, refs_df: pd.DataFrame) -
 
     Joins articles_df and refs_df on article_id.
     """
-    # TODO: merge the two DataFrames on article_id
-    # TODO: iterate, summarize each article, compute ROUGE vs. reference
-    # TODO: aggregate (mean across summaries) and return the dict
-    raise NotImplementedError("evaluate_summaries not implemented")
+    # Merge the two DataFrames on article_id
+    merged_df = pd.merge(articles_df, refs_df, on="article_id", how="inner")
+    
+    predictions = []
+    total_r1, total_r2, total_rl = 0.0, 0.0, 0.0
+    n = len(merged_df)
+    
+    # Iterate, summarize each article, and compute ROUGE vs. reference
+    for _, row in merged_df.iterrows():
+        art_id = row["article_id"]
+        text = str(row["text"])
+        ref_summary = str(row["reference_summary"])
+        
+        # Generate prediction summary
+        pred_summary = summarize_one(summ, text)
+        
+        # Calculate individual metrics
+        scores = compute_rouge(pred_summary, ref_summary)
+        
+        # Accumulate scores for average calculations
+        total_r1 += scores["rouge1"]
+        total_r2 += scores["rouge2"]
+        total_rl += scores["rougeL"]
+        
+        # Append target metadata dictionary to results array
+        predictions.append({
+            "article_id": art_id,
+            "reference_summary": ref_summary,
+            "predicted_summary": pred_summary,
+            "rouge1": scores["rouge1"],
+            "rouge2": scores["rouge2"],
+            "rougeL": scores["rougeL"]
+        })
+    
+    # Compute total corpus mean metrics safely
+    mean_r1 = total_r1 / n if n > 0 else 0.0
+    mean_r2 = total_r2 / n if n > 0 else 0.0
+    mean_rl = total_rl / n if n > 0 else 0.0
+    
+    return {
+        "rouge1": mean_r1,
+        "rouge2": mean_r2,
+        "rougeL": mean_rl,
+        "n": n,
+        "predictions": predictions
+    }
 
 
 # -- Task 4: Orchestrate -----------------------------------------------------
