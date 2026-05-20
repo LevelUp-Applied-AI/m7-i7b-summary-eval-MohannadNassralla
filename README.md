@@ -49,3 +49,23 @@ Open a Pull Request from your working branch into `main`. The autograder runs `m
 This repository is provided for educational use only. See [LICENSE](LICENSE) for terms.
 
 You may clone and modify this repository for personal learning and practice, and reference code you wrote here in your professional portfolio. Redistribution outside this course is not permitted.
+
+# Tech News Summarization & Evaluation Engine
+
+This component implements an evaluation harness for evaluating abstractive text summarization models against an executive tech news corpus. It processes structural articles, generates concise summaries via sequence-to-sequence neural architectures, and automatically scores target variations across standardized n-gram overlap metrics.
+
+## Model Reference
+* **Model Profile:** `sshleifer/distilbart-cnn-6-6`
+* **Description:** A compact, distilled variation of the standard sequence-to-sequence `facebook/bart-large-cnn` architecture. It leverages a 6-layer encoder paired with a 6-layer decoder, explicitly fine-tuned on the CNN/DailyMail news dataset to output highly structured, fluid news synopses with reduced latency overhead compared to full parameter foundations.
+
+## Corpus Verification
+* **Evaluation Data:** This engine benchmarks performance against **120 structural technology and computing articles** extracted from the M6 corpus distribution.
+* **Ground Truth:** Evaluation uses curated human reference summaries configured in `data/tech_news_summaries_reference.csv` to capture structural news elements, core operational metrics, and explicit executive assertions.
+
+## Reproducibility Execution
+To clear execution caches, configure dependencies within your localized virtual environment, pull the pre-trained weights from the Hugging Face Hub, and run inference across the full 120-article test set, execute:
+
+```bash
+make summarize
+
+
